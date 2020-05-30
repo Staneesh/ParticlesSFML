@@ -7,20 +7,29 @@
 #include <cmath>
 #include <random>
 #include <climits>
+#include <cassert>
 
 #define COUT(x) std::cout<<#x<<": "<<x<<std::endl;
 
-unsigned WINDOW_HEIGHT = 1000;
-unsigned WINDOW_WIDTH = 1500;
+struct WindowParameters
+{
+	unsigned width;
+	unsigned height;
+};
 
-const float GRAVITY = 0.0;
+struct WorldConstants
+{
+	//NOTE(Stanisz): friction?
+	float gravity;
+};
 
-const int MAX_NUM_PARTICLES = 10000;
-const int MAX_NUM_EMITTERS = 5;
+struct RendererParameters
+{
+	int maxNumParticles;
+	int maxNumEmitters;
+	unsigned maxParticleSize;
+};
 
-const float EPSILON = 0.005f;
-
-const unsigned MAX_PARTICLE_SIZE = 10;
 struct Particle
 {
     sf::Vector2f position;
@@ -51,17 +60,17 @@ struct Emitter
     float randomnessInTransparency;
 };
 
-sf::Vector2f toSFML(const sf::Vector2f& v)
+sf::Vector2f toSFML(const sf::Vector2f& v, const WindowParameters& wParams)
 {
-    float newX = v.x*WINDOW_WIDTH / 2 + WINDOW_WIDTH / 2, newY = -(v.y * WINDOW_HEIGHT / 2 - WINDOW_HEIGHT / 2);
+    float newX = v.x*wParams.width / 2 + wParams.width / 2, newY = -(v.y * wParams.height / 2 - wParams.height / 2);
 
     return sf::Vector2f(newX, newY);
 }
 
-sf::Vector2f toNDC(const sf::Vector2f& v)
+sf::Vector2f toNDC(const sf::Vector2f& v, const WindowParameters& wParams)
 {
-    float newX = 2 * v.x / WINDOW_WIDTH - 1;
-    float newY = 2 * v.y / WINDOW_HEIGHT - 1;
+    float newX = 2 * v.x / wParams.width - 1;
+    float newY = 2 * v.y / wParams.height - 1;
     newY *= -1;
 
     return sf::Vector2f(newX, newY);
@@ -105,7 +114,8 @@ sf::Vector2f randomVec2f()
     return result;
 }
 
-void emit(Particle* particles, Emitter& e)
+void emit(Particle* particles, Emitter& e, const WorldConstants& wConstants,
+		const RendererParameters& rParams)
 {
     Particle newParticle;
 
@@ -114,13 +124,15 @@ void emit(Particle* particles, Emitter& e)
         lerp<sf::Vector2f>(e.direction, randomVec2f(), e.randomnessInDirection);
 
     newParticle.mass = e.mass;
-    newParticle.acceleration = newParticle.mass * sf::Vector2f(0, GRAVITY);
+    newParticle.acceleration = newParticle.mass * sf::Vector2f(0, wConstants.gravity);
     newParticle.lifeSpan = e.lifeSpan;
     newParticle.bounceFactor = e.bounceFactor;
-    newParticle.size = (unsigned int)(rand01() * (1.0f - e.randomnessInSize) * MAX_PARTICLE_SIZE) + 4;
+    assert(e.randomnessInSize <= 1.0f && e.randomnessInSize >= 0.0f);
+
+    newParticle.size = (unsigned int)(rand01() * (1.0f - e.randomnessInSize) * rParams.maxParticleSize) + 4;
     newParticle.transparency = (unsigned char)(rand01() * 255.0f * (1.0f - e.randomnessInTransparency)); 
 
-    for (int i =0; i < MAX_NUM_PARTICLES; ++i)
+    for (int i =0; i < rParams.maxNumParticles; ++i)
     {
         auto& curPart = particles[i];
 
@@ -137,14 +149,10 @@ float abs(float a)
     return a < 0.0f ? -a : a;
 }
 
-bool isWithinEpsilonDistance(float f, float from)
-{
-    return (abs(f - from) < EPSILON);
-}
-
-void update(float dt, Particle* particles, Emitter* emitters)
+void update(float dt, Particle* particles, Emitter* emitters,
+		const RendererParameters& rParams, const WorldConstants& wConstants)
 {   
-    for (int i = 0; i < MAX_NUM_EMITTERS; ++i)
+    for (int i = 0; i < rParams.maxNumEmitters; ++i)
     {
         auto& e = emitters[i];
 
@@ -153,12 +161,12 @@ void update(float dt, Particle* particles, Emitter* emitters)
     
         if (e.lastTimeEmitted > e.delay)
         {
-            emit(particles, e);
+            emit(particles, e, wConstants, rParams);
             e.lastTimeEmitted = 0;
         }
     }
     
-    for (int i = 0; i < MAX_NUM_PARTICLES; ++i)
+    for (int i = 0; i < rParams.maxNumParticles; ++i)
     {
         auto& curPart = particles[i];
 
@@ -168,14 +176,12 @@ void update(float dt, Particle* particles, Emitter* emitters)
 
         auto nextPos = curPart.position + dt * curPart.velocity;
 
-        if (isWithinEpsilonDistance(nextPos.y, -1.0f)
-            || isWithinEpsilonDistance(nextPos.y, 1.0f))
+        if (nextPos.y < -1.0f || nextPos.y > 1.0f)
         {
             curPart.velocity.y = -curPart.velocity.y;
             bounced = true;
         }
-        if (isWithinEpsilonDistance(nextPos.x, -1.0f)
-            || isWithinEpsilonDistance(nextPos.x, 1.0f))
+        if (nextPos.x < -1.0f || nextPos.x > 1.0f)
         {
             curPart.velocity.x = -curPart.velocity.x;
             bounced = true;
@@ -204,20 +210,32 @@ void update(float dt, Particle* particles, Emitter* emitters)
 }
 
 
-int main(int argc, char** argv)
+int main()
 {
-    sf::RenderWindow window(sf::VideoMode(WINDOW_WIDTH, WINDOW_HEIGHT), "Particles!");
+	WindowParameters wParams;
+	wParams.width = 1000;
+	wParams.height = 1000;
+
+	WorldConstants wConstants;
+	wConstants.gravity = -0.01f;
+
+	RendererParameters rParams;
+	rParams.maxNumParticles = 10000;
+	rParams.maxNumEmitters = 5;
+	rParams.maxParticleSize = 10;
+
+    sf::RenderWindow window(sf::VideoMode(wParams.width, wParams.height), "Particles!");
     sf::Clock clock;
     
     float elapsed = 0.0f;
 
-    Particle* particles = (Particle*)malloc(sizeof(Particle) * MAX_NUM_PARTICLES);
+    Particle* particles = (Particle*)malloc(sizeof(Particle) * rParams.maxNumParticles);
 
-    Emitter* emitters = (Emitter*)malloc(sizeof(Emitter) * MAX_NUM_EMITTERS);
+    Emitter* emitters = (Emitter*)malloc(sizeof(Emitter) * rParams.maxNumEmitters);
 
     srand(13333);
     
-    for (int i = 0; i < MAX_NUM_EMITTERS; ++i)
+    for (int i = 0; i < rParams.maxNumEmitters; ++i)
     {
         auto& emitter = emitters[i];
 
@@ -262,7 +280,7 @@ int main(int argc, char** argv)
 
 
         bool clicked = sf::Mouse::isButtonPressed(sf::Mouse::Left);
-        sf::Vector2f mousePos = toNDC((sf::Vector2f)sf::Mouse::getPosition(window));
+        sf::Vector2f mousePos = toNDC((sf::Vector2f)sf::Mouse::getPosition(window), wParams);
 
         //std::cout<<mousePos.x<<' ' <<mousePos.y<<std::endl;
         //std::cout<<emitter.position.x<<' ' <<emitter.position.y<<std::endl;
@@ -271,7 +289,7 @@ int main(int argc, char** argv)
         float minDist = 100;
 
             
-        for (int i = 0; i < MAX_NUM_EMITTERS; ++i)
+        for (int i = 0; i < rParams.maxNumEmitters; ++i)
         {
             auto& emitter = emitters[i];
 
@@ -288,7 +306,7 @@ int main(int argc, char** argv)
         }
 
         //TODO(Stanisz): 1D variable scaling to NDC.
-        if (minDist < 2.0f * emitters[whichEmitterPicked].radius / WINDOW_WIDTH)
+        if (minDist < 2.0f * emitters[whichEmitterPicked].radius / wParams.width)
         {
             emitters[whichEmitterPicked].hovering = 1;
 
@@ -311,7 +329,7 @@ int main(int argc, char** argv)
             emitters[whichEmitterPicked].position = mousePos;
         }
 
-        update(dt, particles, emitters);
+        update(dt, particles, emitters, rParams, wConstants);
         window.clear();
 
         
@@ -319,13 +337,13 @@ int main(int argc, char** argv)
         
         visible.setRadius(500);
         visible.setOrigin({500, 500});
-        visible.setPosition(toSFML({0, 0}));
+        visible.setPosition(toSFML({0, 0}, wParams));
         visible.setFillColor({0, 50, 0});
         window.draw(visible);
 
         visible.setOrigin({4, 4});
         
-        for (int i = 0; i < MAX_NUM_PARTICLES; ++i)
+        for (int i = 0; i < rParams.maxNumParticles; ++i)
         {
             auto& curPart = particles[i];
 
@@ -334,12 +352,12 @@ int main(int argc, char** argv)
             visible.setRadius(curPart.size);
             if (curPart.lifeSpan > 0)
             {
-                visible.setPosition(toSFML(curPart.position));
+                visible.setPosition(toSFML(curPart.position, wParams));
                 window.draw(visible);
             }
         }
 
-        for (int i = 0; i < MAX_NUM_EMITTERS; ++i)
+        for (int i = 0; i < rParams.maxNumEmitters; ++i)
         {
             auto& emitter = emitters[i];
             
@@ -349,8 +367,8 @@ int main(int argc, char** argv)
                 visible.setFillColor({255, 0, 0});
             }
             visible.setRadius(emitter.radius);
-            visible.setOrigin({emitter.radius, emitter.radius});
-            visible.setPosition(toSFML(emitter.position));
+            visible.setOrigin({(float)emitter.radius, (float)emitter.radius});
+            visible.setPosition(toSFML(emitter.position, wParams));
             
             window.draw(visible);
         }
