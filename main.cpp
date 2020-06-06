@@ -143,6 +143,11 @@ int main()
 	rParams.maxNumEmitters = 5;
 	rParams.maxParticleSize = 10;
 
+	EmitterButton eButton = {};
+	eButton.position = {-0.5f, 0.0f};
+	eButton.size = {50, 10};
+	eButton.color = sf::Color(120, 120, 0);
+
     sf::RenderWindow window(sf::VideoMode(wParams.width, wParams.height), "Particles!");
     sf::Clock clock;
     
@@ -182,6 +187,17 @@ int main()
         bool clicked = sf::Mouse::isButtonPressed(sf::Mouse::Left);
         sf::Vector2f mousePos = toNDC((sf::Vector2f)sf::Mouse::getPosition(window), wParams);
 
+		if (clicked)
+		{
+			float distYPx = fabs(mousePos.y - eButton.position.y)*wParams.height;
+			float distXPx = fabs(mousePos.x - eButton.position.x)*wParams.width;
+
+			if (distYPx < eButton.size.y
+				&& distXPx< eButton.size.x)
+			{
+				addEmitter(emitters, &rParams);
+			}
+		}
         //std::cout<<mousePos.x<<' ' <<mousePos.y<<std::endl;
         //std::cout<<emitter.position.x<<' ' <<emitter.position.y<<std::endl;
 
@@ -272,6 +288,13 @@ int main()
             
             window.draw(visible);
         }
+
+		sf::RectangleShape buttonSprite;
+		buttonSprite.setSize(eButton.size);
+		buttonSprite.setPosition(toSFML(eButton.position, wParams));
+		buttonSprite.setFillColor(eButton.color);
+		buttonSprite.setOrigin({eButton.size.x /2 , eButton.size.y/ 2});
+		window.draw(buttonSprite);
 
         window.display();
     }
