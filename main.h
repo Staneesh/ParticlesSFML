@@ -15,7 +15,9 @@ struct RendererParameters
 	int maxNumParticles;
 	int maxNumEmitters;
 	unsigned maxParticleSize;
+	int currentNumEmitters;
 };
+
 
 struct Particle
 {

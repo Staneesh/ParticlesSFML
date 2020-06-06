@@ -47,7 +47,7 @@ void emit(Particle* particles, Emitter& e, const WorldConstants& wConstants,
 void update(float dt, Particle* particles, Emitter* emitters,
 		const RendererParameters& rParams, const WorldConstants& wConstants)
 {   
-    for (int i = 0; i < rParams.maxNumEmitters; ++i)
+    for (int i = 0; i < rParams.currentNumEmitters; ++i)
     {
         auto& e = emitters[i];
 
@@ -104,17 +104,41 @@ void update(float dt, Particle* particles, Emitter* emitters,
 
 }
 
+void addEmitter(Emitter *emitters, RendererParameters *rParams)
+{
+	if (rParams->currentNumEmitters == rParams->maxNumEmitters)
+	{
+		return;
+	}
+    auto& emitter = emitters[rParams->currentNumEmitters++];
+
+    
+    emitter.position = sf::Vector2f(randMinusOneToOne(), randMinusOneToOne());
+    
+    emitter.direction = sf::Vector2f(0.0f, 1.0f);
+    emitter.speed = 1;
+    emitter.delay = 0.001f;
+    emitter.lastTimeEmitted = 0;
+    emitter.randomnessInDirection = 0.1f;
+    emitter.radius = 20;
+    emitter.hovering = 0;
+    emitter.lifeSpan = 3;
+    emitter.mass = 100;
+    emitter.bounceFactor = 0.1f;
+    emitter.randomnessInSize = 0.1f;
+    emitter.randomnessInTransparency = 0.3f;
+}
 
 int main()
 {
-	WindowParameters wParams;
+	WindowParameters wParams={};
 	wParams.width = 1000;
 	wParams.height = 1000;
 
-	WorldConstants wConstants;
+	WorldConstants wConstants={};
 	wConstants.gravity = -0.01f;
 
-	RendererParameters rParams;
+	RendererParameters rParams={};
 	rParams.maxNumParticles = 10000;
 	rParams.maxNumEmitters = 5;
 	rParams.maxParticleSize = 10;
@@ -130,26 +154,7 @@ int main()
 
     srand(13333);
     
-    for (int i = 0; i < rParams.maxNumEmitters; ++i)
-    {
-        auto& emitter = emitters[i];
-
-        
-        emitter.position = sf::Vector2f(randMinusOneToOne(), randMinusOneToOne());
-        
-        emitter.direction = sf::Vector2f(0.0f, 1.0f);
-        emitter.speed = 1;
-        emitter.delay = 0.001f;
-        emitter.lastTimeEmitted = 0;
-        emitter.randomnessInDirection = 0.1f;
-        emitter.radius = 20;
-        emitter.hovering = 0;
-        emitter.lifeSpan = 3;
-        emitter.mass = 100;
-        emitter.bounceFactor = 0.1f;
-        emitter.randomnessInSize = 0.1f;
-        emitter.randomnessInTransparency = 0.3f;
-    }
+	addEmitter(emitters, &rParams);
 
     bool grabbing = false;
     
@@ -184,7 +189,7 @@ int main()
         float minDist = 100;
 
             
-        for (int i = 0; i < rParams.maxNumEmitters; ++i)
+        for (int i = 0; i < rParams.currentNumEmitters; ++i)
         {
             auto& emitter = emitters[i];
 
@@ -252,7 +257,7 @@ int main()
             }
         }
 
-        for (int i = 0; i < rParams.maxNumEmitters; ++i)
+        for (int i = 0; i < rParams.currentNumEmitters; ++i)
         {
             auto& emitter = emitters[i];
             
